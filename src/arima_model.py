@@ -1,15 +1,19 @@
 import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# Fitting ARIMA model on the training series
-def train_arima (train_series, order = (1,1,1), trend = "t"):
-    model = ARIMA(train_series, order = order, trend=trend)
-    fitted = model.fit()
+def train_sarima (train_series, order = (1,1,1), seasonal_order = (1,0,1,7)):
+    model = SARIMAX(
+        train_series,
+        order = order,
+        seasonal_order = seasonal_order,
+        enforce_stationarity = False,
+        enforce_invertibility = False
+    )
+    fitted = model.fit(disp = False)
     return fitted
 
-# Used to forecast steps ahead
-def forecast_arima(fitted_model, steps):
+def forecast_sarima(fitted_model, steps):
     forecast = fitted_model.forecast(steps = steps)
     return np.array(forecast)
 
