@@ -3,13 +3,13 @@ from statsmodels.tsa.arima.model import ARIMA
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 # Fitting ARIMA model on the training series
-def train_arima (train_series, order = (1,1,1)):
-    model = ARIMA(train_series, order = order)
+def train_arima (train_series, order = (1,1,1), trend = "t"):
+    model = ARIMA(train_series, order = order, trend=trend)
     fitted = model.fit()
     return fitted
 
 # Used to forecast steps ahead
-def forecast_arima(fitted_model , steps):
+def forecast_arima(fitted_model, steps):
     forecast = fitted_model.forecast(steps = steps)
     return np.array(forecast)
 
