@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from data_loader import load_data
 from preprocessing import preprocess_data
 from sklearn.linear_model import LinearRegression
@@ -52,3 +53,23 @@ print("RMSE: ", round(reg_rmse, 2))
 print("------Naive Baseline Model------")
 print("MAE: ", round(naive_mae, 2))
 print("RMSE: ", round(naive_rmse, 2))
+
+# Actual values from csv file used to plot
+actual = Y_test.values
+
+# Create time axis for plotting
+test_dates = df['date'][split_index:]
+
+plt.figure(figsize=(12 , 6))
+
+plt.plot(test_dates, actual, label = "Actual")
+plt.plot(test_dates, reg_predictions, label = "Regression Model Predictions")
+plt.plot(test_dates, naive_predictions, label = "Baseline Model Predictions")
+
+plt.title("Model Comparison")
+plt.xlabel("Date")
+plt.ylabel("Sales")
+plt.xticks(rotation = 45)
+plt.legend()
+plt.tight_layout()
+plt.show()
