@@ -25,13 +25,30 @@ X_test = X[split_index:]
 Y_train = Y[:split_index]
 Y_test = Y[split_index:]
 
-model = LinearRegression()
-model.fit(X_train, Y_train)
+reg_model = LinearRegression()
+reg_model.fit(X_train, Y_train)
+reg_predictions = reg_model.predict(X_test)
 
-predictions = model.predict(X_test)
+reg_mae = mean_absolute_error(Y_test, reg_predictions)
+reg_rmse = np.sqrt(mean_squared_error(Y_test, reg_predictions))
 
-mae = mean_absolute_error(Y_test, predictions)
-rmse = np.sqrt(mean_squared_error(Y_test, predictions))
+## Naive Baseline model for comparison
 
-print("MAE: ", round(mae, 2))
-print("RMSE: ", round(rmse, 2))
+# Simplest baseline for building a naive model :
+#     y_​t ​= y_(t−1)​
+# MEANING : Tomorrow’s sales will be same as today’s.
+
+naive_predictions = df['lag_1'][split_index:]
+
+naive_mae = mean_absolute_error(Y_test, naive_predictions)
+naive_rmse = np.sqrt(mean_squared_error(Y_test, naive_predictions))
+
+
+print("\n +++++ Model Comparison +++++")
+print("------Regression-----")
+print("MAE: ", round(reg_mae, 2))
+print("RMSE: ", round(reg_rmse, 2))
+
+print("------Naive Baseline Model------")
+print("MAE: ", round(naive_mae, 2))
+print("RMSE: ", round(naive_rmse, 2))
