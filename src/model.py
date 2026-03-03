@@ -64,8 +64,8 @@ split_date = test_dates.iloc[0]
 train_series = series[series.index < split_date]
 test_series = series[series.index >= split_date]
 
-sarima_order = (1,1,1)
-seasonal_order  = (1,0,1,7)
+sarima_order = (2,1,2)
+seasonal_order  = (1,0,0,7)
 
 sarima_model = train_sarima(
     train_series,
