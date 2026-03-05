@@ -6,6 +6,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 from data_loader import load_data
 from preprocessing import preprocess_data
 from arima_model import train_sarima, forecast_sarima
+from inventory import safety_stock, reorder_point, recommended_order_quantity, inventory_decision
 
 # Loading the raw, generated data
 df_raw = load_data("../data/sales_data.csv")
@@ -41,6 +42,31 @@ reg_predictions = reg_model.predict(X_test)
 
 reg_mae = mean_absolute_error(Y_test, reg_predictions)
 reg_rmse = np.sqrt(mean_squared_error(Y_test, reg_predictions))
+
+# INVENTORY SYSTEM USING REGRESSION MODEL:
+
+lead_time_days = 7
+service_level = 0.95
+current_inventory = 120
+target_days = 14
+
+avg_daily_demand = float(np.mean(reg_predictions))
+residuals = Y_test.values - reg_predictions
+demand_std = float(np.std(residuals))
+
+ss = safety_stock(demand_std, lead_time_days, service_level)
+rop = reorder_point(avg_daily_demand, lead_time_days, ss)
+order_qty = recommended_order_quantity(target_days, avg_daily_demand, current_inventory, ss)
+status = inventory_decision(current_inventory, rop)
+
+print("\n----- Inventory Recommendation (Regression-Based) -----")
+print(f"Avg daily demand (forecast): {avg_daily_demand:.2f}")
+print(f"Demand uncertainty (sigma):  {demand_std:.2f}")
+print(f"Safety stock:               {ss:.2f}")
+print(f"Reorder point (ROP):        {rop:.2f}")
+print(f"Current inventory:          {current_inventory:.2f}")
+print(f"Status:                     {status}")
+print(f"Recommended order qty:      {order_qty:.2f}")
 
 ## Naive Baseline model for comparison
 # Simplest baseline for building a naive model :
