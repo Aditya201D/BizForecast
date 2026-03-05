@@ -1,4 +1,10 @@
 import pandas as pd
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message="DataFrameGroupBy.apply operated on the grouping columns"
+)
 
 def add_time_features(df):
     df['day_of_week'] = df['date'].dt.dayofweek
@@ -23,8 +29,20 @@ def preprocess_one_product(df_product):
     return df_product
 
 def preprocess_all_products(df):
-    return{
-        df.groupby("product_id", group_keys = False)
+    df = df[["date", "product_id", "sales"]].copy()
+    return (
+        df.groupby("product_id", group_keys=False)
           .apply(preprocess_one_product)
-          .reset_index(drop = True)
-    }
+          .reset_index(drop=True)
+    )
+
+def preprocess_data(df):
+    """
+    Backwards compatible:
+    - If df has product_id -> preprocess each product separately
+    - Else -> treat df as a single product time series
+    """
+    if "product_id" in df.columns:
+        return preprocess_all_products(df)
+    else:
+        return preprocess_one_product(df)
