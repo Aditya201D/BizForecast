@@ -14,9 +14,17 @@ def add_rolling_features(df, window=7):
     df[f'rolling_mean_{window}'] = df['sales'].rolling(window=window).mean()
     return df
 
-def preprocess_data(df):
-    df = add_time_features(df)
-    df = add_lag_features(df)
-    df = add_rolling_features(df)
-    df = df.dropna()
-    return df
+def preprocess_one_product(df_product):
+    df_product = df_product.sort_values("date").copy()
+    df_product = add_time_features(df_product)
+    df_product = add_lag_features(df_product)
+    df_product = add_rolling_features(df_product)
+    df_product = df_product.dropna()
+    return df_product
+
+def preprocess_all_products(df):
+    return{
+        df.groupby("product_id", group_keys = False)
+          .apply(preprocess_one_product)
+          .reset_index(drop = True)
+    }
