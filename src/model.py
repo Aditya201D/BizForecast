@@ -7,6 +7,7 @@ from data_loader import load_data
 from preprocessing import preprocess_data
 from arima_model import train_sarima, forecast_sarima
 from inventory import safety_stock, reorder_point, recommended_order_quantity, inventory_decision
+from db_manager import get_connection, get_inventory_settings, ensure_inventory_row
 
 split_ratio = 0.8
 
@@ -23,7 +24,7 @@ SARIMA_product_id = "P003"
 sarima_order = (2,1,2)
 seasonal_order = (1,0,0,7)
 
-PLOT_PRODUCT_ID = "P003"
+SELECTED_PRODUCT_ID = None
 
 def _eval (y_true, y_prediction):
     mae = mean_absolute_error(y_true, y_prediction)
@@ -37,7 +38,14 @@ df_raw = load_data("../data/sales_data.csv")
 if "product_id" not in df_raw.columns:
     df_raw["product_id"] = "P001"
 
-product_ids = sorted(df_raw["product_id"].unique())
+all_product_ids = sorted(df_raw["product_id"].unique())
+
+if SELECTED_PRODUCT_ID is not None:
+    if SELECTED_PRODUCT_ID not in all_product_ids:
+        raise ValueError(f"Product {SELECTED_PRODUCT_ID} not found in dataset.")
+    product_ids = [SELECTED_PRODUCT_ID]
+else:
+    product_ids = all_product_ids
 
 print("\n===== MULTI-PRODUCT RUN =====")
 print(f"Products found: {product_ids}\n")
@@ -87,15 +95,35 @@ for pid in product_ids:
 
     # INVENTORY SYSTEM USING REGRESSION MODEL:
 
-    current_inventory = DEFAULT_CURRENT_INVENTORY
+    # Pull per-product settings from DB (fallback to defaults)
+    conn = get_connection()
+    try:
+        ensure_inventory_row(conn, pid, current_inventory=DEFAULT_CURRENT_INVENTORY,
+                            lead_time_days=lead_time_days,
+                            service_level=service_level,
+                            target_days=target_days)
+        inv_row = get_inventory_settings(conn, pid)
+    finally:
+        conn.close()
+
+    if inv_row:
+        current_inventory = int(inv_row["current_inventory"])
+        lead_time_days_local = int(inv_row["lead_time_days"])
+        service_level_local = float(inv_row["service_level"])
+        target_days_local = int(inv_row["target_days"])
+    else:
+        current_inventory = DEFAULT_CURRENT_INVENTORY
+        lead_time_days_local = lead_time_days
+        service_level_local = service_level
+        target_days_local = target_days
 
     avg_daily_demand = float(np.mean(reg_predictions))
     residuals = Y_test.values - reg_predictions
     demand_std = float(np.std(residuals))
 
-    ss = safety_stock(demand_std, lead_time_days, service_level)
-    rop = reorder_point(avg_daily_demand, lead_time_days, ss)
-    order_qty = recommended_order_quantity(target_days, avg_daily_demand, current_inventory, ss)
+    ss = safety_stock(demand_std, lead_time_days_local, service_level_local)
+    rop = reorder_point(avg_daily_demand, lead_time_days_local, ss)
+    order_qty = recommended_order_quantity(target_days_local, avg_daily_demand, current_inventory, ss)
     status = inventory_decision(current_inventory, rop)
 
     print("\n----- Inventory Recommendation (Regression-Based) -----")
@@ -170,7 +198,7 @@ for pid in product_ids:
 
     # PLOTTING:
 
-    if PLOT_PRODUCT_ID is not None and pid == PLOT_PRODUCT_ID:
+    if SELECTED_PRODUCT_ID is not None and pid == SELECTED_PRODUCT_ID:
         # Actual values from csv file used to plot
         actual = Y_test.values
 
