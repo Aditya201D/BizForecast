@@ -101,5 +101,87 @@ def update_inventory_settings (conn, product_id, current_inventory, lead_time_da
         cur.execute(q, (current_inventory, lead_time_days, service_level, target_days, product_id))
     conn.commit()
 
+def insert_forecast_result(
+    conn,
+    product_id,
+    regression_mae,
+    regression_rmse,
+    naive_mae,
+    naive_rmse,
+    sarima_mae,
+    sarima_rmse,
+    best_model,
+    avg_demand,
+    safety_stock,
+    reorder_point,
+    current_inventory,
+    recommended_order_qty,
+    status
+):
+    q = """
+    INSERT INTO forecast_results (
+        product_id,
+        regression_mae,
+        regression_rmse,
+        naive_mae,
+        naive_rmse,
+        sarima_mae,
+        sarima_rmse,
+        best_model,
+        avg_demand,
+        safety_stock,
+        reorder_point,
+        current_inventory,
+        recommended_order_qty,
+        status
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            q,
+            (
+                product_id,
+                regression_mae,
+                regression_rmse,
+                naive_mae,
+                naive_rmse,
+                sarima_mae,
+                sarima_rmse,
+                best_model,
+                avg_demand,
+                safety_stock,
+                reorder_point,
+                current_inventory,
+                recommended_order_qty,
+                status
+            )
+        )
+    conn.commit()
+
+
+def get_recent_forecast_results(conn, product_id, limit=5):
+    q = """
+    SELECT
+        run_time,
+        best_model,
+        regression_mae,
+        naive_mae,
+        sarima_mae,
+        avg_demand,
+        reorder_point,
+        current_inventory,
+        recommended_order_qty,
+        status
+    FROM forecast_results
+    WHERE product_id = %s
+    ORDER BY run_time DESC
+    LIMIT %s
+    """
+    with conn.cursor(dictionary=True) as cur:
+        cur.execute(q, (product_id, limit))
+        rows = cur.fetchall()
+    return rows
+
 if __name__ == "__main__":
     import_sales_csv("../data/sales_data.csv")

@@ -7,6 +7,13 @@ from model import run_forecast_for_product
 from data_loader import load_data
 from db_manager import get_connection, get_inventory_settings, update_inventory_settings
 
+from db_manager import (
+    get_connection,
+    get_inventory_settings,
+    update_inventory_settings,
+    insert_forecast_result,
+    get_recent_forecast_results
+)
 
 # -----------------------------
 # Page config
@@ -119,6 +126,44 @@ if run_clicked:
     comparison_df = pd.DataFrame(comparison_rows)
     best_model_row = comparison_df.loc[comparison_df["MAE"].idxmin()]
     best_model_name = best_model_row["Model"]
+
+    # -----------------------------
+    # Save forecast result to DB
+    # -----------------------------
+    conn_save = get_connection()
+    insert_forecast_result(
+        conn_save,
+        product_id=product,
+        regression_mae=float(result["mae"]),
+        regression_rmse=float(result["rmse"]),
+        naive_mae=float(result["naive_mae"]),
+        naive_rmse=float(result["naive_rmse"]),
+        sarima_mae=float(result["sarima_mae"]) if result.get("sarima_mae") is not None else None,
+        sarima_rmse=float(result["sarima_rmse"]) if result.get("sarima_rmse") is not None else None,
+        best_model=best_model_name,
+        avg_demand=float(result["avg_demand"]),
+        safety_stock=float(result["safety_stock"]),
+        reorder_point=float(result["rop"]),
+        current_inventory=int(result["current_inventory"]),
+        recommended_order_qty=float(result["order_qty"]),
+        status=result["status"]
+    )
+    conn_save.close()
+
+    # -----------------------------
+    # Recent Forecast History
+    # -----------------------------
+    st.markdown("## 🕘 Recent Forecast History")
+
+    conn_hist = get_connection()
+    history_rows = get_recent_forecast_results(conn_hist, product, limit=5)
+    conn_hist.close()
+
+    if history_rows:
+        history_runs_df = pd.DataFrame(history_rows)
+        st.dataframe(history_runs_df, use_container_width=True)
+    else:
+        st.info("No saved forecast history yet for this product.")
 
     # -----------------------------
     # KPI cards
