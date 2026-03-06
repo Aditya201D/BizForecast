@@ -9,7 +9,6 @@ from db_manager import get_connection, get_inventory_settings, update_inventory_
 st.title("BizForecast — Sales Demand Forecasting System")
 
 df = load_data("../data/sales_data.csv")
-
 products = sorted(df["product_id"].unique())
 
 product = st.selectbox("Select Product", products)
@@ -32,8 +31,11 @@ st.subheader("Inventory Controls")
 
 new_inventory = st.number_input("Current Inventory", min_value=0, value=int(current_inventory))
 new_lead_time = st.number_input("Lead Time (days)", min_value=1, value=int(lead_time_days))
-new_service_level = st.selectbox("Service Level", [0.90, 0.95, 0.97, 0.99],
-                                 index=[0.90, 0.95, 0.97, 0.99].index(float(service_level)))
+new_service_level = st.selectbox(
+    "Service Level",
+    [0.90, 0.95, 0.97, 0.99],
+    index=[0.90, 0.95, 0.97, 0.99].index(float(service_level))
+)
 new_target_days = st.number_input("Target Days", min_value=1, value=int(target_days))
 
 if st.button("Update Inventory Settings"):
@@ -47,15 +49,47 @@ if st.button("Update Inventory Settings"):
     )
     st.success("Inventory settings updated.")
 
-
 if st.button("Run Forecast"):
 
     result = run_forecast_for_product(product)
 
+    comparison_rows = [
+        {
+            "Model": "Regression",
+            "MAE": result["mae"],
+            "RMSE": result["rmse"]
+        },
+        {
+            "Model": "Naive Baseline",
+            "MAE": result["naive_mae"],
+            "RMSE": result["naive_rmse"]
+        }
+    ]
+
+    if result.get("sarima_mae") is not None and result.get("sarima_rmse") is not None:
+        comparison_rows.append(
+            {
+                "Model": "SARIMA",
+                "MAE": result["sarima_mae"],
+                "RMSE": result["sarima_rmse"]
+            }
+        )
+
+    comparison_df = pd.DataFrame(comparison_rows)
+    best_model_row = comparison_df.loc[comparison_df["MAE"].idxmin()]
+    best_model_name = best_model_row["Model"]
+
     st.subheader("Model Performance")
+
     col1, col2 = st.columns(2)
-    col1.metric("MAE", f"{result['mae']:.2f}")
-    col2.metric("RMSE", f"{result['rmse']:.2f}")
+    col1.metric("Regression MAE", f"{result['mae']:.2f}")
+    col2.metric("Regression RMSE", f"{result['rmse']:.2f}")
+
+    st.subheader("Model Comparison")
+
+    st.dataframe(comparison_df, use_container_width=True)
+
+    st.success(f"Best model for this product: {best_model_name}")
 
     st.subheader("Inventory Recommendation")
 
@@ -72,7 +106,7 @@ if st.button("Run Forecast"):
     if result["status"] == "REORDER NOW":
         st.error("⚠ REORDER REQUIRED")
     else:
-        st.success("Inventory OK")
+        st.success("✅ Inventory OK")
 
     st.subheader("Forecast Visualization")
 

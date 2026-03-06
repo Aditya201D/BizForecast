@@ -284,6 +284,40 @@ def run_forecast_for_product(product_id):
     naive_mae = mean_absolute_error(y_test, naive_predictions)
     naive_rmse = np.sqrt(mean_squared_error(y_test, naive_predictions))
 
+    sarima_mae = None
+    sarima_rmse = None
+
+    try:
+        series = (
+            df[["date", "sales"]]
+            .groupby("date", as_index=True)["sales"]
+            .sum()
+            .sort_index()
+        )
+        series = series.asfreq("D")
+
+        split_date = test_dates.iloc[0]
+        train_series = series[series.index < split_date]
+        test_series = series[series.index >= split_date]
+
+        if len(train_series) >= 50 and len(test_series) >= 5:
+            sarima_model = train_sarima(
+                train_series,
+                order=sarima_order,
+                seasonal_order=seasonal_order
+            )
+            sarima_prediction = forecast_sarima(sarima_model, steps=len(test_series))
+
+            min_len = min(len(test_series), len(sarima_prediction))
+            sarima_true = test_series.values[:min_len]
+            sarima_prediction = sarima_prediction[:min_len]
+
+            sarima_mae = mean_absolute_error(sarima_true, sarima_prediction)
+            sarima_rmse = np.sqrt(mean_squared_error(sarima_true, sarima_prediction))
+    except Exception:
+        sarima_mae = None
+        sarima_rmse = None
+
     avg_daily_demand = float(np.mean(reg_predictions))
     residuals = y_test.values - reg_predictions
     demand_std = float(np.std(residuals))
@@ -314,5 +348,9 @@ def run_forecast_for_product(product_id):
         "rop": rop,
         "current_inventory": current_inventory,
         "order_qty": order_qty,
-        "status": status
+        "status": status,
+        "naive_mae": naive_mae,
+        "naive_rmse": naive_rmse,
+        "sarima_mae": sarima_mae,
+        "sarima_rmse": sarima_rmse,
     }
