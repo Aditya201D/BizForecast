@@ -88,6 +88,18 @@ def import_sales_csv(csv_path: str):
     finally:
         conn.close()
 
+def update_inventory_settings (conn, product_id, current_inventory, lead_time_days, service_level, target_days):
+    q = """
+    UPDATE inventory
+    SET current_inventory = %s,
+        lead_time_days = %s,
+        service_level = %s,
+        target_days = %s
+    WHERE product_id = %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(q, (current_inventory, lead_time_days, service_level, target_days, product_id))
+    conn.commit()
 
 if __name__ == "__main__":
     import_sales_csv("../data/sales_data.csv")
