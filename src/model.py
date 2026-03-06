@@ -238,3 +238,72 @@ for r in summary_rows:
         f"{r['product_id']} | reg_MAE={r['reg_mae']:.2f} | naive_MAE={r['naive_mae']:.2f} "
         f"| {r['status']} | ROP={r['rop']:.1f} | order={r['order_qty']:.1f}"
     )
+
+
+# DASHBOARD
+
+def run_forecast_for_product(product_id):
+    """
+    Runs forecasting + inventory pipeline for a single product.
+    Returns dictionary with results.
+    """
+
+    df = load_data("../data/sales_data.csv")
+    df = df[df["product_id"] == product_id].copy()
+
+    df_reg = preprocess_data(df)
+
+    features = ["day_of_week", "month", "lag_1", "lag_7", "rolling_mean_7"]
+
+    X = df_reg[features]
+    y = df_reg["sales"]
+
+    split_index = int(len(df_reg) * split_ratio)
+
+    X_train = X[:split_index]
+    X_test = X[split_index:]
+
+    y_train = y[:split_index]
+    y_test = y[split_index:]
+
+    test_dates = df_reg["date"][split_index:]
+
+    reg_model = LinearRegression()
+    reg_model.fit(X_train, y_train)
+
+    reg_predictions = reg_model.predict(X_test)
+
+    reg_mae = mean_absolute_error(y_test, reg_predictions)
+    reg_rmse = np.sqrt(mean_squared_error(y_test, reg_predictions))
+
+    avg_daily_demand = float(np.mean(reg_predictions))
+    residuals = y_test.values - reg_predictions
+    demand_std = float(np.std(residuals))
+
+    conn = get_connection()
+    inv = get_inventory_settings(conn, product_id)
+    conn.close()
+
+    current_inventory = inv["current_inventory"]
+    lead_time = inv["lead_time_days"]
+    service_level = inv["service_level"]
+    target_days = inv["target_days"]
+
+    ss = safety_stock(demand_std, lead_time, service_level)
+    rop = reorder_point(avg_daily_demand, lead_time, ss)
+    order_qty = recommended_order_quantity(target_days, avg_daily_demand, current_inventory, ss)
+    status = inventory_decision(current_inventory, rop)
+
+    return {
+        "dates": test_dates,
+        "actual": y_test,
+        "prediction": reg_predictions,
+        "mae": reg_mae,
+        "rmse": reg_rmse,
+        "avg_demand": avg_daily_demand,
+        "safety_stock": ss,
+        "rop": rop,
+        "current_inventory": current_inventory,
+        "order_qty": order_qty,
+        "status": status
+    }
