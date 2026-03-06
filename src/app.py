@@ -6,12 +6,21 @@ from model import run_forecast_for_product
 from data_loader import load_data
 from db_manager import get_connection, get_inventory_settings, update_inventory_settings
 
+st.set_page_config(
+    page_title="BizForecast",
+    layout="wide"
+)
+
 st.title("BizForecast — Sales Demand Forecasting System")
+st.caption("AI-based demand forecasting and inventory recommendation for small businesses.")
 
 df = load_data("../data/sales_data.csv")
 products = sorted(df["product_id"].unique())
 
-product = st.selectbox("Select Product", products)
+top_left, top_right = st.columns([2, 1])
+
+with top_left:
+    product = st.selectbox("Select Product", products)
 
 conn = get_connection()
 inv = get_inventory_settings(conn, product)
@@ -27,30 +36,31 @@ else:
     service_level = inv["service_level"]
     target_days = inv["target_days"]
 
-st.subheader("Inventory Controls")
-
-new_inventory = st.number_input("Current Inventory", min_value=0, value=int(current_inventory))
-new_lead_time = st.number_input("Lead Time (days)", min_value=1, value=int(lead_time_days))
-new_service_level = st.selectbox(
-    "Service Level",
-    [0.90, 0.95, 0.97, 0.99],
-    index=[0.90, 0.95, 0.97, 0.99].index(float(service_level))
-)
-new_target_days = st.number_input("Target Days", min_value=1, value=int(target_days))
-
-if st.button("Update Inventory Settings"):
-    update_inventory_settings(
-        conn,
-        product,
-        int(new_inventory),
-        int(new_lead_time),
-        float(new_service_level),
-        int(new_target_days)
+with top_right:
+    st.markdown("### Inventory Controls")
+    new_inventory = st.number_input("Current Inventory", min_value=0, value=int(current_inventory))
+    new_lead_time = st.number_input("Lead Time (days)", min_value=1, value=int(lead_time_days))
+    new_service_level = st.selectbox(
+        "Service Level",
+        [0.90, 0.95, 0.97, 0.99],
+        index=[0.90, 0.95, 0.97, 0.99].index(float(service_level))
     )
-    st.success("Inventory settings updated.")
+    new_target_days = st.number_input("Target Days", min_value=1, value=int(target_days))
 
-if st.button("Run Forecast"):
+    if st.button("Update Inventory Settings"):
+        update_inventory_settings(
+            conn,
+            product,
+            int(new_inventory),
+            int(new_lead_time),
+            float(new_service_level),
+            int(new_target_days)
+        )
+        st.success("Inventory settings updated.")
 
+run_clicked = st.button("Run Forecast")
+
+if run_clicked:
     result = run_forecast_for_product(product)
 
     comparison_rows = [
@@ -79,48 +89,86 @@ if st.button("Run Forecast"):
     best_model_row = comparison_df.loc[comparison_df["MAE"].idxmin()]
     best_model_name = best_model_row["Model"]
 
-    st.subheader("Model Performance")
+    # KPI cards
+    st.markdown("---")
+    k1, k2, k3, k4 = st.columns(4)
 
-    col1, col2 = st.columns(2)
-    col1.metric("Regression MAE", f"{result['mae']:.2f}")
-    col2.metric("Regression RMSE", f"{result['rmse']:.2f}")
+    k1.metric("Best Model", best_model_name)
+    k2.metric("Regression MAE", f"{result['mae']:.2f}")
+    k3.metric("Current Inventory", f"{result['current_inventory']}")
+    k4.metric("Reorder Point", f"{result['rop']:.2f}")
 
-    st.subheader("Model Comparison")
+    # Chart + Inventory Summary
+    left_col, right_col = st.columns([2, 1])
 
-    st.dataframe(comparison_df, use_container_width=True)
+    with left_col:
+        st.markdown("## Forecast Visualization")
 
-    st.success(f"Best model for this product: {best_model_name}")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(result["dates"], result["actual"], label="Actual")
+        ax.plot(result["dates"], result["prediction"], label="Forecast")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Sales")
+        ax.legend()
+        plt.xticks(rotation=45)
+        plt.tight_layout()
 
-    st.subheader("Inventory Recommendation")
+        st.pyplot(fig)
 
-    col3, col4 = st.columns(2)
-    col3.metric("Average Daily Demand", f"{result['avg_demand']:.2f}")
-    col4.metric("Safety Stock", f"{result['safety_stock']:.2f}")
+    with right_col:
+        st.markdown("## Inventory Recommendation")
 
-    col5, col6 = st.columns(2)
-    col5.metric("Reorder Point", f"{result['rop']:.2f}")
-    col6.metric("Recommended Order Qty", f"{result['order_qty']:.2f}")
+        c1, c2 = st.columns(2)
+        c1.metric("Avg Daily Demand", f"{result['avg_demand']:.2f}")
+        c2.metric("Safety Stock", f"{result['safety_stock']:.2f}")
 
-    st.write(f"**Current Inventory:** {result['current_inventory']}")
+        c3, c4 = st.columns(2)
+        c3.metric("Reorder Point", f"{result['rop']:.2f}")
+        c4.metric("Order Qty", f"{result['order_qty']:.2f}")
 
-    if result["status"] == "REORDER NOW":
-        st.error("⚠ REORDER REQUIRED")
-    else:
-        st.success("✅ Inventory OK")
+        st.write(f"**Current Inventory:** {result['current_inventory']}")
 
-    st.subheader("Forecast Visualization")
+        if result["status"] == "REORDER NOW":
+            st.error("⚠ Reorder is recommended immediately.")
+        else:
+            st.success("✅ Inventory level is currently safe.")
 
-    fig, ax = plt.subplots()
+    # Comparison + Business Summary
+    st.markdown("---")
+    col_a, col_b = st.columns([1.2, 1])
 
-    ax.plot(result["dates"], result["actual"], label="Actual")
-    ax.plot(result["dates"], result["prediction"], label="Forecast")
+    with col_a:
+        st.markdown("## Model Comparison")
+        st.dataframe(comparison_df, use_container_width=True)
 
-    ax.legend()
-    plt.xticks(rotation=45)
+    with col_b:
+        st.markdown("## Business Summary")
 
-    st.pyplot(fig)
+        inventory_gap = result["current_inventory"] - result["rop"]
 
-    st.subheader("Forecast Table")
+        st.info(
+            f"""
+            **Selected Product:** {product}
+
+            **Best-performing model:** {best_model_name}
+
+            **Forecasted average demand:** {result['avg_demand']:.2f} units/day
+
+            **Inventory position:** {'Below reorder point' if result['status'] == 'REORDER NOW' else 'Above reorder point'}
+
+            **Recommended action:** {'Place a replenishment order' if result['status'] == 'REORDER NOW' else 'Monitor inventory and continue operations'}
+            """
+        )
+
+        if inventory_gap < 0:
+            st.warning(f"Inventory is below the reorder point by {abs(inventory_gap):.2f} units.")
+        else:
+            st.success(f"Inventory is above the reorder point by {inventory_gap:.2f} units.")
+
+    # Forecast table
+
+    st.markdown("---")
+    st.markdown("## Forecast Table")
 
     forecast_df = pd.DataFrame({
         "Date": result["dates"].values,
@@ -130,14 +178,18 @@ if st.button("Run Forecast"):
 
     st.dataframe(forecast_df, use_container_width=True)
 
-    st.subheader("Historical Sales Data")
+    # Historical sales table
+
+    st.markdown("## Historical Sales Data")
 
     history_df = result["processed_df"][["date", "sales"]].copy()
     history_df.columns = ["Date", "Sales"]
 
     st.dataframe(history_df, use_container_width=True)
 
-    st.subheader("Download Report")
+    # Download report
+    
+    st.markdown("## Download Report")
 
     report_df = forecast_df.copy()
     csv = report_df.to_csv(index=False).encode("utf-8")
