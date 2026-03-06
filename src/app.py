@@ -53,16 +53,21 @@ if st.button("Run Forecast"):
     result = run_forecast_for_product(product)
 
     st.subheader("Model Performance")
-    st.write(f"MAE: {result['mae']:.2f}")
-    st.write(f"RMSE: {result['rmse']:.2f}")
+    col1, col2 = st.columns(2)
+    col1.metric("MAE", f"{result['mae']:.2f}")
+    col2.metric("RMSE", f"{result['rmse']:.2f}")
 
     st.subheader("Inventory Recommendation")
 
-    st.write(f"Average Daily Demand: {result['avg_demand']:.2f}")
-    st.write(f"Safety Stock: {result['safety_stock']:.2f}")
-    st.write(f"Reorder Point: {result['rop']:.2f}")
-    st.write(f"Current Inventory: {result['current_inventory']}")
-    st.write(f"Recommended Order Quantity: {result['order_qty']:.2f}")
+    col3, col4 = st.columns(2)
+    col3.metric("Average Daily Demand", f"{result['avg_demand']:.2f}")
+    col4.metric("Safety Stock", f"{result['safety_stock']:.2f}")
+
+    col5, col6 = st.columns(2)
+    col5.metric("Reorder Point", f"{result['rop']:.2f}")
+    col6.metric("Recommended Order Qty", f"{result['order_qty']:.2f}")
+
+    st.write(f"**Current Inventory:** {result['current_inventory']}")
 
     if result["status"] == "REORDER NOW":
         st.error("⚠ REORDER REQUIRED")
@@ -80,5 +85,34 @@ if st.button("Run Forecast"):
     plt.xticks(rotation=45)
 
     st.pyplot(fig)
+
+    st.subheader("Forecast Table")
+
+    forecast_df = pd.DataFrame({
+        "Date": result["dates"].values,
+        "Actual Sales": result["actual"].values,
+        "Predicted Sales": result["prediction"]
+    })
+
+    st.dataframe(forecast_df, use_container_width=True)
+
+    st.subheader("Historical Sales Data")
+
+    history_df = result["processed_df"][["date", "sales"]].copy()
+    history_df.columns = ["Date", "Sales"]
+
+    st.dataframe(history_df, use_container_width=True)
+
+    st.subheader("Download Report")
+
+    report_df = forecast_df.copy()
+    csv = report_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download Forecast Report as CSV",
+        data=csv,
+        file_name=f"{product}_forecast_report.csv",
+        mime="text/csv"
+    )
 
 conn.close()
