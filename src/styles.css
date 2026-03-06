@@ -1,0 +1,59 @@
+/* Main page spacing */
+.block-container {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+    max-width: 1400px;
+}
+
+/* Header card */
+.main-header {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.main-header h1 {
+    margin: 0;
+    color: #f8fafc;
+    font-size: 2.2rem;
+}
+
+.main-header p {
+    margin: 0.35rem 0 0 0;
+    color: #cbd5e1;
+    font-size: 1rem;
+}
+
+/* Buttons */
+.stButton > button {
+    border-radius: 10px;
+    font-weight: 600;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* Input widgets */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div {
+    border-radius: 10px;
+}
+
+/* Dataframe section spacing */
+[data-testid="stDataFrame"] {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Metric cards */
+[data-testid="metric-container"] {
+    background-color: rgba(30, 41, 59, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    padding: 12px 14px;
+    border-radius: 14px;
+}
+
+/* Slightly improve headings spacing */
+h2, h3 {
+    margin-top: 0.4rem;
+}

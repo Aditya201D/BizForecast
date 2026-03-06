@@ -1,18 +1,48 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
 
 from model import run_forecast_for_product
 from data_loader import load_data
 from db_manager import get_connection, get_inventory_settings, update_inventory_settings
 
+
+# -----------------------------
+# Page config
+# -----------------------------
 st.set_page_config(
     page_title="BizForecast",
+    page_icon="📈",
     layout="wide"
 )
 
-st.title("BizForecast — Sales Demand Forecasting System")
-st.caption("AI-based demand forecasting and inventory recommendation for small businesses.")
+
+# -----------------------------
+# Load custom CSS
+# -----------------------------
+def load_css():
+    css_path = Path(__file__).parent / "styles.css"
+    if css_path.exists():
+        with open(css_path, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
+load_css()
+
+
+# -----------------------------
+# Header
+# -----------------------------
+st.markdown(
+    """
+    <div class="main-header">
+        <h1>BizForecast</h1>
+        <p>AI-based demand forecasting and inventory recommendation for small businesses</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 df = load_data("../data/sales_data.csv")
 products = sorted(df["product_id"].unique())
@@ -20,6 +50,7 @@ products = sorted(df["product_id"].unique())
 top_left, top_right = st.columns([2, 1])
 
 with top_left:
+    st.markdown("### Product Selection")
     product = st.selectbox("Select Product", products)
 
 conn = get_connection()
@@ -37,7 +68,7 @@ else:
     target_days = inv["target_days"]
 
 with top_right:
-    st.markdown("### Inventory Controls")
+    st.markdown("### ⚙ Inventory Controls")
     new_inventory = st.number_input("Current Inventory", min_value=0, value=int(current_inventory))
     new_lead_time = st.number_input("Lead Time (days)", min_value=1, value=int(lead_time_days))
     new_service_level = st.selectbox(
@@ -58,7 +89,7 @@ with top_right:
         )
         st.success("Inventory settings updated.")
 
-run_clicked = st.button("Run Forecast")
+run_clicked = st.button("Run Forecast", use_container_width=True)
 
 if run_clicked:
     result = run_forecast_for_product(product)
@@ -89,24 +120,41 @@ if run_clicked:
     best_model_row = comparison_df.loc[comparison_df["MAE"].idxmin()]
     best_model_name = best_model_row["Model"]
 
+    # -----------------------------
     # KPI cards
+    # -----------------------------
     st.markdown("---")
-    k1, k2, k3, k4 = st.columns(4)
+    st.markdown("## Key Metrics")
 
+    k1, k2, k3, k4 = st.columns(4)
     k1.metric("Best Model", best_model_name)
     k2.metric("Regression MAE", f"{result['mae']:.2f}")
     k3.metric("Current Inventory", f"{result['current_inventory']}")
     k4.metric("Reorder Point", f"{result['rop']:.2f}")
 
+    # -----------------------------
     # Chart + Inventory Summary
+    # -----------------------------
     left_col, right_col = st.columns([2, 1])
 
     with left_col:
-        st.markdown("## Forecast Visualization")
+        st.markdown("##  Forecast Visualization")
 
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(result["dates"], result["actual"], label="Actual")
-        ax.plot(result["dates"], result["prediction"], label="Forecast")
+        ax.plot(
+            result["dates"],
+            result["actual"],
+            label="Actual",
+            color="#22c55e",
+            linewidth=2.2
+        )
+        ax.plot(
+            result["dates"],
+            result["prediction"],
+            label="Forecast",
+            color="#f59e0b",
+            linewidth=2.2
+        )
         ax.set_xlabel("Date")
         ax.set_ylabel("Sales")
         ax.legend()
@@ -116,7 +164,7 @@ if run_clicked:
         st.pyplot(fig)
 
     with right_col:
-        st.markdown("## Inventory Recommendation")
+        st.markdown("##  Inventory Recommendation")
 
         c1, c2 = st.columns(2)
         c1.metric("Avg Daily Demand", f"{result['avg_demand']:.2f}")
@@ -133,31 +181,33 @@ if run_clicked:
         else:
             st.success("✅ Inventory level is currently safe.")
 
+    # -----------------------------
     # Comparison + Business Summary
+    # -----------------------------
     st.markdown("---")
     col_a, col_b = st.columns([1.2, 1])
 
     with col_a:
-        st.markdown("## Model Comparison")
+        st.markdown("## 🤖 Model Comparison")
         st.dataframe(comparison_df, use_container_width=True)
 
     with col_b:
-        st.markdown("## Business Summary")
+        st.markdown("## 🧾 Business Summary")
 
         inventory_gap = result["current_inventory"] - result["rop"]
 
         st.info(
             f"""
-            **Selected Product:** {product}
+**Selected Product:** {product}
 
-            **Best-performing model:** {best_model_name}
+**Best-performing model:** {best_model_name}
 
-            **Forecasted average demand:** {result['avg_demand']:.2f} units/day
+**Forecasted average demand:** {result['avg_demand']:.2f} units/day
 
-            **Inventory position:** {'Below reorder point' if result['status'] == 'REORDER NOW' else 'Above reorder point'}
+**Inventory position:** {'Below reorder point' if result['status'] == 'REORDER NOW' else 'Above reorder point'}
 
-            **Recommended action:** {'Place a replenishment order' if result['status'] == 'REORDER NOW' else 'Monitor inventory and continue operations'}
-            """
+**Recommended action:** {'Place a replenishment order' if result['status'] == 'REORDER NOW' else 'Monitor inventory and continue operations'}
+"""
         )
 
         if inventory_gap < 0:
@@ -165,10 +215,11 @@ if run_clicked:
         else:
             st.success(f"Inventory is above the reorder point by {inventory_gap:.2f} units.")
 
+    # -----------------------------
     # Forecast table
-
+    # -----------------------------
     st.markdown("---")
-    st.markdown("## Forecast Table")
+    st.markdown("## 📋 Forecast Table")
 
     forecast_df = pd.DataFrame({
         "Date": result["dates"].values,
@@ -178,18 +229,20 @@ if run_clicked:
 
     st.dataframe(forecast_df, use_container_width=True)
 
+    # -----------------------------
     # Historical sales table
-
-    st.markdown("## Historical Sales Data")
+    # -----------------------------
+    st.markdown("## 🗂 Historical Sales Data")
 
     history_df = result["processed_df"][["date", "sales"]].copy()
     history_df.columns = ["Date", "Sales"]
 
     st.dataframe(history_df, use_container_width=True)
 
+    # -----------------------------
     # Download report
-    
-    st.markdown("## Download Report")
+    # -----------------------------
+    st.markdown("## ⬇ Download Report")
 
     report_df = forecast_df.copy()
     csv = report_df.to_csv(index=False).encode("utf-8")
@@ -198,7 +251,8 @@ if run_clicked:
         label="Download Forecast Report as CSV",
         data=csv,
         file_name=f"{product}_forecast_report.csv",
-        mime="text/csv"
+        mime="text/csv",
+        use_container_width=True
     )
 
 conn.close()
